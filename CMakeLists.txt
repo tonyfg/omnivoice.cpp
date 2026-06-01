@@ -151,6 +151,11 @@ add_executable(omnivoice-tts tools/omnivoice-tts.cpp)
 target_link_libraries(omnivoice-tts PRIVATE omnivoice-core)
 link_ggml_backends(omnivoice-tts)
 
+# omnivoice-tts-server : OpenAI-compatible TTS API server.
+add_executable(omnivoice-tts-server src/http-tts-server.cpp)
+target_link_libraries(omnivoice-tts-server PRIVATE omnivoice-core)
+link_ggml_backends(omnivoice-tts-server)
+
 # test-abi-c : pure C99 smoke test that locks in the public ABI contract.
 # Compiles omnivoice.h with a C compiler under -Wall -Werror -pedantic and
 # links against the static lib. The test never loads a model ; failure

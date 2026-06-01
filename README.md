@@ -17,6 +17,7 @@ by GGML. C++17 port of OmniVoice (k2-fsa/OmniVoice). 646 languages,
 - Q8_0 quantisation of the 612 M parameter Qwen3 backbone
 - Two CLI tools : `omnivoice-tts` (text -> WAV) and `omnivoice-codec`
   (WAV <-> RVQ codes)
+- An OpenAI-compatible TTS API server (`omnivoice-tts-server`)
 
 ## Build
 
@@ -62,6 +63,72 @@ Voice cloning :
     --codec models/omnivoice-tokenizer-F32.gguf \
     --ref-wav ref.wav --ref-text ref.txt \
     --lang English -o out.wav < prompt.txt
+```
+
+## API server
+
+The `omnivoice-tts-server` binary ships with the default build (built alongside
+the CLI tools). It exposes an OpenAI-compatible TTS API on port 8000:
+
+```
+./build/omnivoice-tts-server \
+    --model models/omnivoice-base-Q8_0.gguf \
+    --codec models/omnivoice-tokenizer-F32.gguf
+```
+
+Optional flags: `--port <int>` (default 8000), `--no-fa` (disable flash
+attention), `--clamp-fp16` (clamp hidden states to FP16 range).
+
+### Endpoints
+
+**`POST /v1/audio/speech`** — synthesize audio from text.
+
+```bash
+curl -X POST http://localhost:8000/v1/audio/speech \
+    -H "Content-Type: application/json" \
+    -d '{"input": "Hello world.", "response_format": "wav", "speed": 1.0}' \
+    -o speech.wav
+```
+
+Request body parameters (all optional unless noted):
+
+- `input` *(string, required)* — Text to synthesize
+- `model` *(string)* — Model id, `"omnivoice"` (default)
+- `voice` *(string)* — Voice name (`"alloy"`, `"echo"`, `"fable"`, `"onyx"`,
+  `"nova"`, `"shimmer"`); all map to the same voice today
+- `response_format` *(string)* — `"json"`, `"text"`, `"srt"`, `"verbose_json"`,
+  `"wav"` (default), or `"mp3"`
+- `speed` *(float)* — Playback speed 0.25..4.0 (default 1.0)
+
+Returns the requested format as the response body.
+
+**`GET /v1/models`** — list available models.
+
+```bash
+curl http://localhost:8000/v1/models
+# → {"object":"list","data":[{"id":"omnivoice","object":"model",...}]}
+```
+
+**`GET /`** — server info.
+
+Compatible with the OpenAI TTS API contract, so existing OpenAI SDK clients
+work out of the box:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="omnivoice",   # ignored by the server
+)
+
+with open("speech.wav", "wb") as f:
+    response = client.audio.speech.create(
+        model="omnivoice",
+        voice="alloy",
+        input="Hello from OmniVoice!",
+    )
+    f.write(response.content)
 ```
 
 ## Embedding the library
